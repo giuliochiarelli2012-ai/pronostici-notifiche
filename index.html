@@ -169,22 +169,30 @@ ul.pl li{margin:6px 0}
   }
 
   function nativePerm() { try { return window.Notification ? Notification.permission : "default"; } catch (e) { return "default"; } }
+  /* "denied" letto all'apertura non basta: su iPhone a volte e' sbagliato anche se nessuno ha detto di no.
+     Il pulsante c'e' sempre; la spiegazione per sbloccare compare solo se il tentativo non va. */
   function state() {
     if (!OS.Notifications.isPushSupported()) return "nosupport";
-    if (nativePerm() === "denied") return "denied";
     if (OS.Notifications.permission && OS.User.PushSubscription.optedIn) return "on";
     return "off";
   }
   function render() {
     var st = state();
     if (st === "nosupport") show(card("<h2>Qui le notifiche non arrivano</h2><p>Questo browser non riceve notifiche. Su <b>Android</b> apri il link con <b>Chrome</b>. Su <b>iPhone</b> serve iOS 16.4 o più recente e l'icona sulla schermata Home.</p>"));
-    else if (st === "denied") show(card("<h2>Notifiche bloccate</h2><p>Hai detto di no al permesso. Per riattivarle:</p><ul class=\"pl\"><li><b>iPhone</b>: cancella l'icona Pronostici dalla schermata Home, aggiungila di nuovo e tocca «Attiva notifiche».</li><li><b>Android</b>: tocca il lucchetto accanto all'indirizzo → Notifiche → Consenti, poi ricarica la pagina.</li></ul>"));
     else if (st === "on") { relink(); onScreen(false); }
     else offScreen();
+  }
+  function unblock() {
+    return IOS ? "<p>Su iPhone apri <b>Impostazioni</b> → <b>Notifiche</b>, cerca <b>Pronostici</b> e accendi <b>Consenti notifiche</b>. Poi chiudi l'icona Pronostici (scorrila via dalle app aperte), riaprila e tocca «Riprova».</p><p class=\"mu\">Se nell'elenco delle notifiche «Pronostici» non c'è, cancella l'icona dalla schermata Home, aggiungila di nuovo da Safari e tocca «Attiva notifiche».</p>"
+      : "<p>Tocca il lucchetto accanto all'indirizzo → <b>Notifiche</b> → <b>Consenti</b>, poi ricarica la pagina e tocca «Riprova».</p>";
   }
   function offScreen() {
     show(card("<h2>Ciao " + esc(WHO.nick) + "!</h2><p>Tocca il pulsante e poi <b>«Consenti»</b>: riceverai i gol delle partite che hai pronosticato, la fine partita con i tuoi punti e un promemoria se ti manca un pronostico.</p>" +
       "<button class=\"btn\" id=\"go\">Attiva notifiche</button><p class=\"mu\" id=\"msg\"></p>"));
+    $("go").onclick = activate;
+  }
+  function blocked() {
+    show(card("<h2>Il telefono non dà il permesso</h2>" + unblock() + "<button class=\"btn\" id=\"go\">Riprova</button><p class=\"mu\" id=\"msg\"></p>"));
     $("go").onclick = activate;
   }
   function platform() { return IOS ? "iphone" : /Android/i.test(UA) ? "android" : "computer"; }
@@ -205,7 +213,7 @@ ul.pl li{margin:6px 0}
     try { p = OS.Notifications.requestPermission(); } catch (e) { p = Promise.reject(e); }       /* subito, dentro il tocco: e' quello che chiede Safari */
     Promise.resolve(p).then(function () {
       if (!OS.Notifications.permission) {
-        if (nativePerm() === "denied") return render();
+        if (nativePerm() === "denied") return blocked();
         b.disabled = false; b.textContent = "Attiva notifiche";
         m.textContent = "Per ricevere le notifiche devi toccare «Consenti». Riprova.";
         return;
