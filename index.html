@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pronostici · Notifiche</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pronostici">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b5d3b">
+<style>
+:root{--g:#0b7a4b;--gd:#05643a;--bg:#f2f6f3;--card:#fff;--tx:#13211a;--mu:#5b6a62;--ln:#d9e3dd;--r:#c0392b}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1612;--card:#16211b;--tx:#e7efe9;--mu:#9db0a5;--ln:#2a3a32}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--tx);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
+header{background:linear-gradient(135deg,#0d6b43,#053a24);color:#fff;padding:calc(env(safe-area-inset-top) + 20px) 18px 20px}
+header .w{max-width:520px;margin:0 auto;display:flex;align-items:center;gap:12px}
+header img{width:44px;height:44px;border-radius:12px;flex:none}
+header h1{margin:0;font-size:22px;line-height:1.1}
+header p{margin:3px 0 0;font-size:14px;opacity:.85}
+main{max-width:520px;margin:0 auto;padding:16px 16px calc(env(safe-area-inset-bottom) + 28px)}
+.cd{background:var(--card);border:1px solid var(--ln);border-radius:18px;padding:18px;margin-bottom:14px}
+h2{margin:0 0 8px;font-size:19px;line-height:1.25}
+p{margin:8px 0}
+.btn{display:block;width:100%;margin-top:14px;border:0;border-radius:14px;padding:15px 12px;background:linear-gradient(135deg,var(--g),var(--gd));color:#fff;font-family:inherit;font-size:17px;font-weight:700;line-height:1.2;text-align:center;text-decoration:none;cursor:pointer;-webkit-appearance:none}
+.btn[disabled]{opacity:.6}
+.btn.alt{background:none;border:1.5px solid var(--ln);color:var(--tx);font-weight:600}
+.mu{color:var(--mu);font-size:14px}
+.ok{color:var(--g)}
+.err{color:var(--r)}
+ol.st{list-style:none;counter-reset:s;padding:0;margin:14px 0 4px}
+ol.st li{counter-increment:s;position:relative;padding:3px 0 14px 44px;min-height:34px}
+ol.st li::before{content:counter(s);position:absolute;left:0;top:0;width:30px;height:30px;border-radius:50%;background:var(--g);color:#fff;display:grid;place-items:center;font-weight:700;font-size:15px}
+.ic{display:inline-block;width:20px;height:20px;vertical-align:-4px;color:var(--g)}
+ul.last{list-style:none;padding:0;margin:6px 0 0}
+ul.last li{padding:10px 0;border-top:1px solid var(--ln)}
+ul.last b{display:block}
+ul.last small{color:var(--mu)}
+input{width:100%;margin-top:10px;padding:12px;border:1.5px solid var(--ln);border-radius:12px;background:var(--bg);color:var(--tx);font-family:inherit;font-size:16px}
+ul.pl{padding-left:20px}
+ul.pl li{margin:6px 0}
+</style>
+</head>
+<body>
+<header><div class="w"><img src="icon-192.png" alt=""><div><h1>Notifiche</h1><p>Pronostici Serie A</p></div></div></header>
+<main id="app"><div class="cd"><p class="mu">Un attimo…</p></div></main>
+<script>
+(function () {
+  "use strict";
+  var $ = function (i) { return document.getElementById(i); };
+  var LS = {
+    get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  var SRV_RE = /^https:\/\/script\.google\.com\/(?:a\/macros\/[^\/?#]+|macros)\/s\/[A-Za-z0-9_-]+\/exec$/;
+  var TOK_RE = /^[0-9a-f]{8}\.[A-Za-z0-9_-]{16}$/;
+  var Q = new URLSearchParams(location.search);
+  var S = "", T = "", GO = Q.get("go") === "1";
+  var UA = navigator.userAgent || "";
+  var IOS = /iPad|iPhone|iPod/.test(UA) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var STANDALONE = window.navigator.standalone === true || !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  var BASE = location.pathname.replace(/[^\/]*$/, "");
+  var WHO = null, OS = null, cbn = 0;
+  var SHARE = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M7.5 7.5L12 3l4.5 4.5M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/></svg>';
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function card(h) { return '<div class="cd">' + h + "</div>"; }
+  function show(h) { $("app").innerHTML = h; }
+  function when(t) { try { return new Date(t).toLocaleString("it-IT", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } }
+  function useLink(s, t) {
+    if (!SRV_RE.test(s || "") || !TOK_RE.test(t || "")) return false;
+    S = s; T = t; LS.set("s", s); LS.set("t", t);
+    return true;
+  }
+  /* il server e' su Google (altro sito): risposta JSONP, solo verso l'indirizzo dell'app */
+  function api(params) {
+    return new Promise(function (res, rej) {
+      var name = "__nt" + (++cbn) + "_" + Date.now(), sc = document.createElement("script"), done = false, q = [];
+      var to = setTimeout(function () { fin(); rej(new Error("il server non risponde")); }, 30000);
+      function fin() { done = true; clearTimeout(to); try { delete window[name]; } catch (e) { window[name] = undefined; } if (sc.parentNode) sc.parentNode.removeChild(sc); }
+      window[name] = function (r) { if (done) return; fin(); res(r); };
+      for (var k in params) q.push(encodeURIComponent(k) + "=" + encodeURIComponent(params[k]));
+      q.push("t=" + encodeURIComponent(T), "cb=" + name);
+      sc.src = S + "?" + q.join("&");
+      sc.onerror = function () { if (done) return; fin(); rej(new Error("server non raggiungibile")); };
+      document.head.appendChild(sc);
+    });
+  }
+
+  function start() {
+    if (!S || !T) return noLink();
+    show(card('<p class="mu">Un attimo…</p>'));
+    api({ nt: "who" }).then(function (w) {
+      if (!w || !w.ok) return problem(w && w.e);
+      WHO = w;
+      if (GO && !IOS && !STANDALONE && w.link) { location.replace(w.link); return; }        /* dal clic su una notifica: dritto all'app */
+      if (IOS && !STANDALONE) return iosHome();
+      return loadOneSignal().then(render, function (e) {
+        show(card("<h2>Servizio notifiche non raggiungibile</h2><p>" + esc(e && e.message ? e.message : e) + ".</p><p class=\"mu\">Controlla la connessione e riprova.</p><button class=\"btn\" id=\"rt\">Riprova</button>"));
+        $("rt").onclick = function () { location.reload(); };
+      });
+    }, function (e) {
+      show(card("<h2>Server non raggiungibile</h2><p class=\"mu\">" + esc(e.message) + ". Controlla la connessione.</p><button class=\"btn\" id=\"rt\">Riprova</button>"));
+      $("rt").onclick = start;
+    });
+  }
+
+  function problem(e) {
+    var t = {
+      LINK: ["Link non valido", "Questo link non funziona più. Apri l'app dei pronostici, tocca la campanella in alto e poi «Attiva notifiche»."],
+      NON_ATTIVE: ["Notifiche non ancora pronte", "Chi gestisce il gioco deve ancora finire di configurarle. Riprova più tardi."],
+      NON_INSTALLATO: ["Sito non installato", "Il sito dei pronostici non è ancora installato."],
+      BLOCCATO: ["Troppi tentativi", "Aspetta qualche minuto e riprova."]
+    }[e] || ["Qualcosa non va", "Errore: " + esc(e || "sconosciuto") + ". Riprova più tardi."];
+    show(card("<h2>" + t[0] + "</h2><p>" + t[1] + "</p>"));
+  }
+
+  function noLink() {
+    show(card("<h2>Apri dall'app dei pronostici</h2><p>Questa pagina serve ad attivare le notifiche: apri l'app dei pronostici, tocca la <b>campanella</b> in alto e poi <b>«Attiva notifiche»</b>.</p>" +
+      "<p class=\"mu\">Se l'hai aperta dall'icona sulla schermata Home e ti chiede il link, incolla qui il link che hai copiato prima:</p>" +
+      "<input id=\"lk\" placeholder=\"Incolla qui il link\" autocomplete=\"off\" inputmode=\"url\"><button class=\"btn\" id=\"ok\">Continua</button><p class=\"mu err\" id=\"msg\"></p>"));
+    $("ok").onclick = function () {
+      var v = ($("lk").value || "").trim(), u = null;
+      try { u = new URL(v); } catch (e) {}
+      if (u && useLink(u.searchParams.get("s"), u.searchParams.get("t"))) start();
+      else $("msg").textContent = "Non è il link giusto: copialo di nuovo dall'app (campanella → Attiva notifiche).";
+    };
+  }
+
+  function iosHome() {
+    show(card("<h2>Ciao " + esc(WHO.nick) + "!</h2><p>Su iPhone le notifiche arrivano solo dall'<b>icona sulla schermata Home</b>. Ci vuole un minuto, una volta sola:</p>" +
+      "<ol class=\"st\"><li>Tocca <b>Condividi</b> " + SHARE + " (su iOS 26 lo trovi dopo aver toccato <b>«···»</b>).</li>" +
+      "<li>Scegli <b>«Aggiungi alla schermata Home»</b>, lascia acceso «Apri come app web» se c'è, poi tocca <b>Aggiungi</b>.</li>" +
+      "<li>Apri la nuova icona <b>Pronostici</b> dalla schermata Home e tocca <b>«Attiva notifiche»</b>.</li></ol>" +
+      "<p class=\"mu\">Non trovi «Aggiungi alla schermata Home»? Apri questa pagina con <b>Safari</b>. Serve iOS 16.4 o più recente.</p>" +
+      "<button class=\"btn alt\" id=\"cp\">Copia il mio link (serve solo se l'icona te lo chiede)</button><p class=\"mu\" id=\"msg\"></p>"));
+    $("cp").onclick = function () {
+      var t = location.href, m = $("msg");
+      var done = function () { m.textContent = "Link copiato."; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, function () { m.textContent = t; });
+      else m.textContent = t;
+    };
+  }
+
+  function loadOneSignal() {
+    return new Promise(function (res, rej) {
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      var s = document.createElement("script");
+      s.src = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
+      s.defer = true;
+      s.onerror = function () { rej(new Error("non riesco a caricare OneSignal")); };
+      document.head.appendChild(s);
+      var to = setTimeout(function () { rej(new Error("OneSignal non risponde")); }, 25000);
+      window.OneSignalDeferred.push(function (OneSignal) {
+        Promise.resolve(OneSignal.init({
+          appId: WHO.app,
+          serviceWorkerPath: BASE.slice(1) + "OneSignalSDKWorker.js",
+          serviceWorkerParam: { scope: BASE },
+          autoResubscribe: true,
+          notifyButton: { enable: false }
+        })).then(function () { clearTimeout(to); OS = OneSignal; res(); }, function (e) { clearTimeout(to); rej(e); });
+      });
+    });
+  }
+
+  function nativePerm() { try { return window.Notification ? Notification.permission : "default"; } catch (e) { return "default"; } }
+  function state() {
+    if (!OS.Notifications.isPushSupported()) return "nosupport";
+    if (nativePerm() === "denied") return "denied";
+    if (OS.Notifications.permission && OS.User.PushSubscription.optedIn) return "on";
+    return "off";
+  }
+  function render() {
+    var st = state();
+    if (st === "nosupport") show(card("<h2>Qui le notifiche non arrivano</h2><p>Questo browser non riceve notifiche. Su <b>Android</b> apri il link con <b>Chrome</b>. Su <b>iPhone</b> serve iOS 16.4 o più recente e l'icona sulla schermata Home.</p>"));
+    else if (st === "denied") show(card("<h2>Notifiche bloccate</h2><p>Hai detto di no al permesso. Per riattivarle:</p><ul class=\"pl\"><li><b>iPhone</b>: cancella l'icona Pronostici dalla schermata Home, aggiungila di nuovo e tocca «Attiva notifiche».</li><li><b>Android</b>: tocca il lucchetto accanto all'indirizzo → Notifiche → Consenti, poi ricarica la pagina.</li></ul>"));
+    else if (st === "on") { relink(); onScreen(false); }
+    else offScreen();
+  }
+  function offScreen() {
+    show(card("<h2>Ciao " + esc(WHO.nick) + "!</h2><p>Tocca il pulsante e poi <b>«Consenti»</b>: riceverai i gol delle partite che hai pronosticato, la fine partita con i tuoi punti e un promemoria se ti manca un pronostico.</p>" +
+      "<button class=\"btn\" id=\"go\">Attiva notifiche</button><p class=\"mu\" id=\"msg\"></p>"));
+    $("go").onclick = activate;
+  }
+  function platform() { return IOS ? "iphone" : /Android/i.test(UA) ? "android" : "computer"; }
+  function waitSub() {
+    return new Promise(function (res) {
+      var n = 0;
+      (function chk() {
+        var ps = OS.User.PushSubscription;
+        if ((ps.id && ps.optedIn) || n++ > 40) return res();
+        setTimeout(chk, 500);
+      })();
+    });
+  }
+  function activate() {
+    var b = $("go"), m = $("msg");
+    b.disabled = true; b.textContent = "Un attimo…"; m.textContent = "";
+    var p;
+    try { p = OS.Notifications.requestPermission(); } catch (e) { p = Promise.reject(e); }       /* subito, dentro il tocco: e' quello che chiede Safari */
+    Promise.resolve(p).then(function () {
+      if (!OS.Notifications.permission) {
+        if (nativePerm() === "denied") return render();
+        b.disabled = false; b.textContent = "Attiva notifiche";
+        m.textContent = "Per ricevere le notifiche devi toccare «Consenti». Riprova.";
+        return;
+      }
+      return Promise.resolve(OS.login(WHO.ext)).then(waitSub).then(function () {
+        return api({ nt: "on", p: platform() });
+      }).then(function (r) {
+        if (!r || !r.ok) throw new Error(r && r.e ? r.e : "il server non ha confermato");
+        WHO.on = 1;
+        onScreen(true);
+      });
+    }).catch(function (e) {
+      b.disabled = false; b.textContent = "Attiva notifiche";
+      m.textContent = "Non è andata (" + (e && e.message ? e.message : e) + "). Riprova.";
+    });
+  }
+  function relink() {                                       /* gia' attive su questo telefono: mi assicuro che il server lo sappia */
+    Promise.resolve(OS.login(WHO.ext)).then(function () { if (!WHO.on) return api({ nt: "on", p: platform() }).then(function (r) { if (r && r.ok) WHO.on = 1; }); }).catch(function () {});
+  }
+  function onScreen(first) {
+    var L = (WHO.last || []).map(function (x) { return "<li><b>" + esc(x.ti) + "</b>" + esc(x.b).replace(/\n/g, "<br>") + "<br><small>" + esc(when(x.t)) + "</small></li>"; }).join("");
+    show(card("<h2 class=\"ok\">✅ Notifiche attive</h2><p>" + (first ? "Fatto! Ti mando subito una notifica di prova." : "Ciao " + esc(WHO.nick) + ", su questo telefono le notifiche sono attive.") + "</p>" +
+      (IOS ? "<p class=\"mu\">Lascia l'icona Pronostici sulla schermata Home: se la cancelli le notifiche si fermano.</p>" : "") +
+      (WHO.link ? "<a class=\"btn\" href=\"" + esc(WHO.link) + "\" target=\"_blank\" rel=\"noopener\">Apri i pronostici</a>" : "") +
+      "<button class=\"btn alt\" id=\"pv\">Mandami una prova</button><p class=\"mu\" id=\"msg\"></p>") +
+      (L ? card("<h2>Ultimi avvisi</h2><ul class=\"last\">" + L + "</ul>") : ""));
+    $("pv").onclick = function () { test(0); };
+    if (first) setTimeout(function () { test(0); }, 1500);
+  }
+  function test(n) {
+    var m = $("msg");
+    if (!m) return;
+    m.textContent = "Invio la prova…";
+    api({ nt: "test" }).then(function (r) {
+      if (r && r.ok && r.sent) m.textContent = "Prova mandata: arriva tra pochi secondi.";
+      else if (r && r.ok && n < 3) setTimeout(function () { test(n + 1); }, 4000);            /* il telefono si sta ancora collegando */
+      else if (r && r.e === "ASPETTA") m.textContent = "Aspetta qualche secondo e riprova.";
+      else m.textContent = "Il telefono non risulta ancora collegato: riprova tra un minuto.";
+    }, function () { m.textContent = "Server non raggiungibile: riprova."; });
+  }
+
+  var qs = Q.get("s"), qt = Q.get("t"), prevS = LS.get("s");
+  if (qs && qt && SRV_RE.test(qs) && TOK_RE.test(qt) && prevS && prevS !== qs) {
+    /* questo telefono era collegato a un altro sito dei pronostici: si cambia solo se lo vuoi tu */
+    show(card("<h2>Link di un altro sito</h2><p>Questo telefono riceveva le notifiche da un altro sito dei pronostici. Vuoi passare a quello di questo link?</p>" +
+      "<button class=\"btn\" id=\"yes\">Sì, passa a questo</button><button class=\"btn alt\" id=\"no\">No, resta com'era</button>"));
+    $("yes").onclick = function () { useLink(qs, qt); start(); };
+    $("no").onclick = function () { useLink(prevS, LS.get("t")); start(); };
+  } else {
+    if (!useLink(qs, qt)) useLink(prevS, LS.get("t"));
+    start();
+  }
+})();
+</script>
+</body>
+</html>
